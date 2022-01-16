@@ -29,7 +29,7 @@ sub regstr {
     return $str;
 }
 
-# "abc de" => "abc","bc ","c d"," de"
+# "abc abc",3 => {"abc":2,"bc ":1,"c a":1," ab":1}
 sub mk_ngram {
     my ($key, $n) = @_;
     my @chars = split(//, $key);

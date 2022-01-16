@@ -1,0 +1,6 @@
+2022-01-16  Tatsuwo  <yto at example.com>
+
+	* mkii.pl: fix comment
+
+	* searchii.pl: vgscore => vgrate
+
