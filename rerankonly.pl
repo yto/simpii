@@ -16,6 +16,7 @@ my $top_n = 10;
 my @sort_by = (); # hits or ccrate or vgrate
 my $auto_cut = 1; # 1(ON) or 0(OFF)
 my $show_mode = 1; # 0(OFF) or 1(with query+score) or 2(with query)
+my $comment_block_prefix = "";
 GetOptions (
     "1=s" => \$field_1,
     "2=s" => \$field_2,
@@ -23,6 +24,7 @@ GetOptions (
     "sortby=s" => \@sort_by,
     "autocut=s" => \$auto_cut,
     "show=s" => \$show_mode,
+    "comment-block-prefix=s" => \$comment_block_prefix,
     );
 
 @sort_by = qw(ccrate vgrate) if not @sort_by; # default order of sort
@@ -31,11 +33,17 @@ $/ = "\n\n";
 
 while (<>) {
     s/\n+$/\n/;
+    s/^\n+//;
 
-    my ($qline, @lines) = split(/\n/, $_);
-    print $qline."\n" if $show_mode;
+    if ($comment_block_prefix and /^\Q$comment_block_prefix/) {
+	print $_."\n";
+	next;
+    }
 
-    my $key = regstr((split(/\t/, $qline))[$field_1] || "");
+    my ($query_line, @lines) = split(/\n/, $_);
+    print $query_line."\n" if $show_mode;
+
+    my $key = regstr((split(/\t/, $query_line))[$field_1] || "");
 
     # get results
     my $lines_r = do {
@@ -48,8 +56,11 @@ while (<>) {
 	$l_r;
     };
 
-    my $res_r = re_ranking($key, $lines_r, $auto_cut);
-    print "".($show_mode == 1 ? "[$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
+    if (@$lines_r) {
+	my $res_r = re_ranking($key, $lines_r, $auto_cut);
+	print "".($show_mode == 1 ? "[$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
+    }
+    print "\n";
 }
 
 exit;
@@ -67,6 +78,7 @@ sub re_ranking {
     my $max_vgrate = max(map {$_->{vgrate}} @$rr);
     if ($auto_cut) {
 	@$rr = grep {!($max_ccrate == 1 and $_->{ccrate} < 1)
+			 and $_->{vgrate} > 0
 			 and ($max_vgrate/$_->{vgrate} < 2)} @$rr;
     }
 
@@ -142,7 +154,7 @@ sub calc_score_ccrate {
     foreach my $e (@$ents_r) {
 	my $ent_chars_r = counthash_to_list(mk_ngram($e->{str}, 1));
 	my @matched_ngrams = @{common_items($key_chars_r, $ent_chars_r)};
-	$e->{ccrate} = sprintf("%.4f", @matched_ngrams / @$key_chars_r);
+	$e->{ccrate} = sprintf("%.4f", @matched_ngrams / (@$key_chars_r||1));
     }
     return $ents_r;
 } 
@@ -155,7 +167,7 @@ sub calc_score_vgrate {
     foreach my $e (@$ents_r) {
 	my $ent_vgram_r = counthash_to_list(mk_all_ngram($e->{str}));
 	my @matched_vgrams = @{common_items($key_vgram_r, $ent_vgram_r)};
-	$e->{vgrate} = sprintf("%.4f", @matched_vgrams / @$key_vgram_r);
+	$e->{vgrate} = sprintf("%.4f", @matched_vgrams / (@$key_vgram_r||1));
     }
     return $ents_r;
 } 

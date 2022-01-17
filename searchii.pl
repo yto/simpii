@@ -37,7 +37,6 @@ open(my $fh_ent, "<", $ent_fn) or die "can't open [$ent_fn]";
 
 my $n_of_ngram = do {(my $l = <$fh_idx>) =~ s/^([^\t]+)\t.*$/$1/s; length($l);};
 @sort_by = qw(hits ccrate vgrate) if not @sort_by; # default order of sort
-push @sort_by, "hits";
 
 while (<>) {
     print $_ if $show_mode;
@@ -86,6 +85,7 @@ sub re_ranking {
     my $max_vgrate = max(map {$_->{vgrate}} @$rr);
     if ($auto_cut) {
 	@$rr = grep {!($max_ccrate == 1 and $_->{ccrate} < 1)
+			 and $_->{vgrate} > 0
 			 and ($max_vgrate/$_->{vgrate} < 2)} @$rr;
     }
 
@@ -99,7 +99,7 @@ sub re_ranking {
 };
 
 # search invertd index. 複数キーでの検索結果のマージ
-# FORMAT: ^のため[\t]B006ZKYBAO,B006ZKYN3Y,B00799VBTY[\n]$
+# FORMAT: ^のため[\t]6ZKYBA,6ZKYN3,799VBT[\n]$
 sub look_and_get_ids {
     my ($keys_r, $fh) = @_;
     my %id_count;
@@ -182,7 +182,7 @@ sub calc_score_ccrate {
     foreach my $e (@$ents_r) {
 	my $ent_chars_r = counthash_to_list(mk_ngram($e->{str}, 1));
 	my @matched_ngrams = @{common_items($key_chars_r, $ent_chars_r)};
-	$e->{ccrate} = sprintf("%.4f", @matched_ngrams / @$key_chars_r);
+	$e->{ccrate} = sprintf("%.4f", @matched_ngrams / (@$key_chars_r||1));
     }
     return $ents_r;
 } 
@@ -195,7 +195,7 @@ sub calc_score_vgrate {
     foreach my $e (@$ents_r) {
 	my $ent_vgram_r = counthash_to_list(mk_all_ngram($e->{str}));
 	my @matched_vgrams = @{common_items($key_vgram_r, $ent_vgram_r)};
-	$e->{vgrate} = sprintf("%.4f", @matched_vgrams / @$key_vgram_r);
+	$e->{vgrate} = sprintf("%.4f", @matched_vgrams / (@$key_vgram_r||1));
     }
     return $ents_r;
 } 
