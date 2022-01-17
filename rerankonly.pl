@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 use strict;
 use warnings;
-use Search::Dict;
 use List::Util qw(sum max);
 use Getopt::Long;
 use utf8;
@@ -11,65 +10,47 @@ binmode STDIN, ":utf8";
 binmode STDOUT, ":utf8";
 $| = 1;
 
-my $idx_fn = "";
-my $ent_fn = "";
 my $field_1 = 0; # keys
 my $field_2 = 1; # ents
 my $top_n = 10;
 my @sort_by = (); # hits or ccrate or vgrate
 my $auto_cut = 1; # 1(ON) or 0(OFF)
-my $reranking = 1; # 1(ON) or 0(OFF)
 my $show_mode = 1; # 0(OFF) or 1(with query+score) or 2(with query)
 GetOptions (
-    "index=s" => \$idx_fn,
-    "entries=s" => \$ent_fn,
     "1=s" => \$field_1,
     "2=s" => \$field_2,
     "topn=s" => \$top_n,
     "sortby=s" => \@sort_by,
     "autocut=s" => \$auto_cut,
-    "reranking=s" => \$reranking,
     "show=s" => \$show_mode,
     );
 
-open(my $fh_idx, "<", $idx_fn) or die "can't open [$idx_fn]";
-open(my $fh_ent, "<", $ent_fn) or die "can't open [$ent_fn]";
+@sort_by = qw(ccrate vgrate) if not @sort_by; # default order of sort
 
-my $n_of_ngram = do {(my $l = <$fh_idx>) =~ s/^([^\t]+)\t.*$/$1/s; length($l);};
-@sort_by = qw(hits ccrate vgrate) if not @sort_by; # default order of sort
-push @sort_by, "hits";
+$/ = "\n\n";
 
 while (<>) {
-    print $_ if $show_mode;
-    chomp;
+    s/\n+$/\n/;
 
-    my $key = regstr((split(/\t/, $_))[$field_1] || "");
+    my ($qline, @lines) = split(/\n/, $_);
+    print $qline."\n" if $show_mode;
+
+    my $key = regstr((split(/\t/, $qline))[$field_1] || "");
 
     # get results
     my $lines_r = do {
-	my $ngram_r = mk_ngram($key, $n_of_ngram);
-	my $id_hit_r = look_and_get_ids([keys %$ngram_r], $fh_idx);
-	my @cand_ids = sort {$id_hit_r->{$b} <=> $id_hit_r->{$a}} keys %$id_hit_r;
-	@cand_ids = @cand_ids[0..($top_n-1)] if $top_n < @cand_ids;
-	my $l_r = get_contents(\@cand_ids, $fh_ent);
-	foreach my $l (@$l_r) {
-	    $l->{hits} = $id_hit_r->{$l->{id}}; # ngram index のヒット数
-	    $l->{str} = regstr((split(/\t/, $l->{line}))[$field_2] || "");
-	    chomp $l->{str};
+	my $l_r = [];
+	foreach my $line (@lines) {
+	    my $str = regstr((split(/\t/, $line))[$field_2] || "");
+	    chomp $str;
+	    push @$l_r, {str => $str, line => $line."\n"};
 	}
 	$l_r;
     };
 
-    if (not $reranking) {
-	print "".($show_mode == 1 ? "[$_->{hits}]\t" : "").$_->{line} for @$lines_r;
-    } else {
-	my $res_r = re_ranking($key, $lines_r, $auto_cut);
-	print "".($show_mode == 1 ? "[$_->{hits},$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
-    }
+    my $res_r = re_ranking($key, $lines_r, $auto_cut);
+    print "".($show_mode == 1 ? "[$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
 }
-
-close($fh_idx);
-close($fh_ent);
 
 exit;
 
@@ -97,27 +78,6 @@ sub re_ranking {
 	}
      } @$rr];
 };
-
-# search invertd index. 複数キーでの検索結果のマージ
-# FORMAT: ^のため[\t]B006ZKYBAO,B006ZKYN3Y,B00799VBTY[\n]$
-sub look_and_get_ids {
-    my ($keys_r, $fh) = @_;
-    my %id_count;
-    foreach my $ngram (@$keys_r) {
-	look $fh, $ngram;
-	my $line = readline($fh);
-	next unless $line =~ /^\Q$ngram\E\t/; # no hit 対策
-	chomp $line;
-	$id_count{$_} += 1 for split(",", (split(/\t/, $line))[1]);
-    }
-    return \%id_count;
-}
-
-# FORMAT: ^[ID]....$
-sub get_contents {
-    my ($ids_r, $fh) = @_;
-    return [grep {$_->{line} =~ /^\Q$_->{id}\E/} map {look $fh, $_; my $line = readline($fh); {id => $_, line => $line}} @$ids_r];
-}
 
 # 文字列正規化
 sub regstr {
