@@ -1,11 +1,14 @@
 # simpii
-Simple Inverted Index Search
+
+simpii は単純な転置インデックス検索システムです。
+
+Simple Inverted Index Search → simpii
 
 ## 準備
 
 Perl が必要。
 ```
-yum install -y perl
+sudo yum install -y perl
 ```
 
 ## 使い方
@@ -19,12 +22,12 @@ yum install -y perl
 
 ```
 % cat test.txt
-1 これはペンです
-2 最近はどうですか？
-3 ペンギン大好き
-4 こんにちは。いかがおすごしですか？
-5 ここ最近疲れ気味
-6 ペンキ塗りたてで気味が悪いです
+1	これはペンです
+2	最近はどうですか？
+3	ペンギン大好き
+4	こんにちは。いかがおすごしですか？
+5	ここ最近疲れ気味
+6	ペンキ塗りたてで気味が悪いです
 % ./mkii.pl test.txt > test.txt.ii 
 % cat test.txt.ii
 。いか	4
@@ -40,6 +43,7 @@ yum install -y perl
 [2,0.5455,0.1818]	4	こんにちは。いかがおすごしですか？
 [2,0.4545,0.1667]	2	最近はどうですか？
 ```
+(test.txt のフォーマット: 第1カラムがID、第2カラムがテキストで文字列マッチ対象)
 
 クエリは行。標準入力。
 ```
@@ -152,7 +156,7 @@ query  Q01				    これはペンギンですか？
 ```
 
 インデックスは文字 ngram。
-"-n" で ngram の N を指定できる。
+"-n" で ngram の N を指定できる。デフォルトは "-n 3"。
 ```
 % ./mkii.pl -n 5 test.txt > test.txt-5.ii
 % cat test.txt-5.ii
@@ -165,6 +169,30 @@ query  Q01				    これはペンギンですか？
 % echo 'これはペンギンですか？' | ./searchii.pl -i test.txt-5.ii -e test.txt
 これはペンギンですか？
 [1,0.6364,0.3030]	1	これはペンです
+```
+```
+% ./mkii.pl -n 2 test.txt | head
+。い	    4
+いか	    4
+いで	    6
+うで	    2
+おす	    4
+か?	    2,4
+かが	    4
+がお	    4
+が悪	    6
+ここ	    5
+% ./mkii.pl -n 1 test.txt | head
+? 2,4
+。	4
+い	4,6
+う	2
+お	4
+か	2,4
+が	4,6
+き	3
+こ	1,4,5
+ご	4
 ```
 
 ### リランキングのみ
