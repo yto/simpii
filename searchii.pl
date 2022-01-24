@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Search::Dict;
-use List::Util qw(sum max);
+use List::Util qw(max min);
 use Getopt::Long;
 use utf8;
 use open ':utf8';
@@ -20,6 +20,7 @@ my @sort_by = (); # hits or ccrate or vgrate
 my $auto_cut = 1; # 1(ON) or 0(OFF)
 my $reranking = 1; # 1(ON) or 0(OFF)
 my $show_mode = 1; # 0(OFF) or 1(with query+score) or 2(with query)
+my $similarity = "qbase"; # qbase(default) jaccard dice simpson
 GetOptions (
     "index=s" => \$idx_fn,
     "entries=s" => \$ent_fn,
@@ -28,14 +29,16 @@ GetOptions (
     "topn=s" => \$top_n,
     "sortby=s" => \@sort_by,
     "autocut=s" => \$auto_cut,
-    "reranking=s" => \$reranking,
     "show=s" => \$show_mode,
+    "reranking=s" => \$reranking,
+    "similarity=s" => \$similarity,
     );
 
 open(my $fh_idx, "<", $idx_fn) or die "can't open [$idx_fn]";
 open(my $fh_ent, "<", $ent_fn) or die "can't open [$ent_fn]";
 
-my $n_of_ngram = do {(my $l = <$fh_idx>) =~ s/^([^\t]+)\t.*$/$1/s; length($l);};
+my $n_of_ngram = do {(my $l = <$fh_idx>) =~ s/^([^\t]+)\t.*$/$1/s; length($l);}; #  ngramのnを調べる
+my $ii_top_n = $top_n * 5; # 転置インデックス検索で取得する数 (結果表示する数のN倍)
 @sort_by = qw(hits ccrate vgrate) if not @sort_by; # default order of sort
 
 while (<>) {
@@ -49,7 +52,7 @@ while (<>) {
 	my $ngram_r = mk_ngram($key, $n_of_ngram);
 	my $id_hit_r = look_and_get_ids([keys %$ngram_r], $fh_idx);
 	my @cand_ids = sort {$id_hit_r->{$b} <=> $id_hit_r->{$a}} keys %$id_hit_r;
-	@cand_ids = @cand_ids[0..($top_n-1)] if $top_n < @cand_ids;
+	@cand_ids = @cand_ids[0..($ii_top_n-1)] if $ii_top_n < @cand_ids;
 	my $l_r = get_contents(\@cand_ids, $fh_ent);
 	foreach my $l (@$l_r) {
 	    $l->{hits} = $id_hit_r->{$l->{id}}; # ngram index のヒット数
@@ -60,10 +63,10 @@ while (<>) {
     };
 
     if (not $reranking) {
-	print "".($show_mode == 1 ? "[$_->{hits}]\t" : "").$_->{line} for @$lines_r;
+	print "".($show_mode == 1 ? "[$_->{hits}]\t" : "").$_->{line} for grep {$_} @{$lines_r}[0..($top_n-1)];
     } else {
 	my $res_r = re_ranking($key, $lines_r, $auto_cut);
-	print "".($show_mode == 1 ? "[$_->{hits},$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
+	print "".($show_mode == 1 ? "[$_->{hits},$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for grep {$_} @{$res_r}[0..($top_n-1)];
     }
 }
 
@@ -174,6 +177,17 @@ sub common_items {
     return \@common_items;
 }
 
+# 類似度計算
+sub calc_similarity {
+    my ($A_r, $B_r) = @_;
+    my @AB = @{common_items($A_r, $B_r)};
+    return 0 if @AB == 0;
+    return @AB / @$A_r if $similarity =~ /^qbase/;
+    return @AB / (@$A_r + @$B_r - @AB) if $similarity =~ /^jaccard/;
+    return @AB * 2 / (@$A_r + @$B_r) if $similarity =~ /^dice/;
+    return @AB / min(@$A_r+0, @$B_r+0) if $similarity =~ /^simpson/;
+}
+
 # 文字列照合でスコア計算
 # cc: common chars rate: 一致した文字数 / キーの文字数
 sub calc_score_ccrate {
@@ -181,8 +195,8 @@ sub calc_score_ccrate {
     my $key_chars_r = counthash_to_list(mk_ngram($key, 1));
     foreach my $e (@$ents_r) {
 	my $ent_chars_r = counthash_to_list(mk_ngram($e->{str}, 1));
-	my @matched_ngrams = @{common_items($key_chars_r, $ent_chars_r)};
-	$e->{ccrate} = sprintf("%.4f", @matched_ngrams / (@$key_chars_r||1));
+	$e->{ccrate} = sprintf("%.4f", calc_similarity($key_chars_r, $ent_chars_r));
+
     }
     return $ents_r;
 } 
@@ -194,8 +208,7 @@ sub calc_score_vgrate {
     my $key_vgram_r = counthash_to_list(mk_all_ngram($key));
     foreach my $e (@$ents_r) {
 	my $ent_vgram_r = counthash_to_list(mk_all_ngram($e->{str}));
-	my @matched_vgrams = @{common_items($key_vgram_r, $ent_vgram_r)};
-	$e->{vgrate} = sprintf("%.4f", @matched_vgrams / (@$key_vgram_r||1));
+	$e->{vgrate} = sprintf("%.4f", calc_similarity($key_vgram_r, $ent_vgram_r));
     }
     return $ents_r;
 } 

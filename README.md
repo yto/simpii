@@ -84,9 +84,9 @@ searchii.pl ではそれぞれ "-e" "-i" オプションで指定する。
 "--show 0": クエリもスコアもなし、"--show 1": 全部あり、"--show 2": クエリだけ。
 ```
 % echo 'これはペンギンですか？' | ./searchii.pl -i test.txt.ii -e test.txt -show 0
-1 これはペンです
-4 こんにちは。いかがおすごしですか？
-2 最近はどうですか？
+1	これはペンです
+4	こんにちは。いかがおすごしですか？
+2	最近はどうですか？
 % echo 'これはペンギンですか？' | ./searchii.pl -i test.txt.ii -e test.txt -show 1
 これはペンギンですか？
 [4,0.6364,0.3030]	1	これはペンです
@@ -110,7 +110,7 @@ query	Q01	これはペンギンですか？
 [2,0.4545,0.1667]	2	最近はどうですか？
 ```
 
-転置インデックス検索での結果保持上限数を "--topn" で指定できる。デフォルトは "--topn 10"。
+出力する検索結果数の上限を "--topn" で指定できる。デフォルトは "--topn 10"。
 ```
 % echo 'これはペンギンですか？' | ./searchii.pl -i test.txt.ii -e test.txt --topn 2
 これはペンギンですか？
@@ -122,6 +122,7 @@ query	Q01	これはペンギンですか？
 複数指定可能。先に指定したものが優先される。
 例えば、"--sortby hits --sortby ccrate" だと hits が同じ場合は ccrate で上下が決まる。
 デフォルトは "--sortby hits --sortby ccrate --sortby vgrate"。
+詳細は後述。
 ```
 % echo '最近はペンですか' | ./searchii.pl -i test.txt.ii -e test.txt --sortby vgrate
 最近はペンですか
@@ -139,6 +140,24 @@ query	Q01	これはペンギンですか？
 最近はペンですか
 [3,0.6250,0.4167]	1	これはペンです
 [2,0.7500,0.3333]	2	最近はどうですか？
+```
+
+リランキング時のスコア（類似度）の計算方法を "--similarity" で指定できる。
+デフォルトは "--similarity qbase"。
+詳細は後述。
+```
+% echo '最近はペンですか' | ./searchii.pl -i test.txt.ii -e test.txt --similarity jaccard
+最近はペンですか
+[3,0.5000,0.3061]	1	これはペンです
+[2,0.5455,0.1739]	2	最近はどうですか？
+% echo '最近はペンですか' | ./searchii.pl -i test.txt.ii -e test.txt --similarity simpson
+最近はペンですか
+[3,0.7143,0.5357]	1	これはペンです
+[2,0.7500,0.3333]	2	最近はどうですか？
+% echo '最近はペンですか' | ./searchii.pl -i test.txt.ii -e test.txt --similarity dice   
+最近はペンですか
+[3,0.6667,0.4688]	1	これはペンです
+[2,0.7059,0.2963]	2	最近はどうですか？
 ```
 
 オートカットはある条件を満たさない結果を表示させない機能。
@@ -247,7 +266,7 @@ query	Q01	これはペンギンですか？
 空行で区切られたブロック単位でリランキングの処理を行う。
 ブロックの先頭行がクエリとなり、他はターゲット（エントリー）。
 
-オプション "-1", "-2", "--topn", "--sortby", "--autocut", "--show" は searchii.pl と同じ。
+オプション "-1", "-2", "--topn", "--sortby", "--autocut", "--show", "--similarity" は searchii.pl と同じ。
 
 オプション "--comment-block-prefix" で処理対象外のブロックの prefix 文字列を指定できる。
 ```
@@ -308,14 +327,21 @@ hits が大きいほど query と近い文字列。
 
 ### リランキング時のスコア計算
 
-ccrate は、query と target の一致文字数を query の文字数で割ったもの。
+リランキング時の指定項目として、
+優先する処理単位 ("--sortby") と類似度計算方法 ("--similarity") の2つがある。
+
+優先する処理単位: 文字 (ccrate)  or 全ngram(vgram)。
+
+ccrate は文字を単位に処理を行う。
+デフォルトの類似度計算方法は、query と target の一致文字数を query の文字数で割ったもの (qbase)。
 
 - query: これはペンギンですか？ (11文字)
 - target: これはペンですね (8文字)
 - 一致文字: こ,れ,は,ぺ,ン,で,す (7文字)
 - ccrate: 7/11 = 0.6363....
 
-vgrate は、query と target の全ngram(vgram)の一致ngram数を query のngram数で割ったもの。
+vgrate は全ngram(vgram)を単位に処理を行う。
+デフォルトの類似計算方法は、query と target の全ngram(vgram)の一致ngram数を query のngram数で割ったもの (qbase)。
 
 - query: あれはペン
   - あれはペン,あれはペ,れはペン,あれは,れはペ,はペン,あれ,れは,はペ,ペン,あ,れ,は,ペ,ン (15)
@@ -324,4 +350,11 @@ vgrate は、query と target の全ngram(vgram)の一致ngram数を query のng
 - 一致ngram
   - は,はペ,はペン,れ,れは,れはペ,れはペン,ペ,ペン,ン (10)
 - vgrate: 10/15 = 0.6666....
+
+類似度計算方法: jaccard係数、dice係数、simpson係数。
+
+- qbase: query と target の一致要素数を query の要素数で割る（デフォルト）
+- jaccard: query と target の一致要素数Aを query と target の要素数の合計からAを引いたもので割る
+- dice: query と target の一致要素数 x 2 を query と target の要素数の合計で割る
+- simpson: query と target の一致要素数を query と target の要素数のうち小さい方で割る
 
