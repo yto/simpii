@@ -1,3 +1,11 @@
+2022-01-27  YAMASHITA Tatsuo  <yto@example.com>
+
+	* rerankonly.pl (counthash_to_list): add sort.
+	(common_items): remove sort.
+
+	* searchii.pl (counthash_to_list): add sort.
+	(common_items): remove sort.
+
 2022-01-24  YAMASHITA Tatsuo  <yto@example.com>
 
 	* README.md: update

@@ -156,19 +156,17 @@ sub mk_all_ngram {
 # {"aac":1,"aa":1,"ab":1,"a":2,"b":1} => ("aaa","aa","ab","a","a","b")
 sub counthash_to_list {
     my ($h_r) = @_;
-    return [map {($_) x $h_r->{$_}} keys %$h_r];
+    return [sort map {($_) x $h_r->{$_}} keys %$h_r];
 }
 
 # (a a b c x) vs (a b d x x) => (a b x)
 sub common_items {
     my ($a_r, $b_r) = @_;
-    my @la = sort @$a_r;
-    my @lb = sort @$b_r;
     my @common_items;
-    for (my ($ia, $ib) = (0, 0); $ia < @la and $ib < @lb; $ia++, $ib++) {
-	if ($la[$ia] eq $lb[$ib]) {
-	    push @common_items, $la[$ia];
-	} elsif (($la[$ia] cmp $lb[$ib]) > 0) {
+    for (my ($ia, $ib) = (0, 0); $ia < @$a_r and $ib < @$b_r; $ia++, $ib++) {
+	if ($a_r->[$ia] eq $b_r->[$ib]) {
+	    push @common_items, $a_r->[$ia];
+	} elsif (($a_r->[$ia] cmp $b_r->[$ib]) > 0) {
 	    $ia--;
 	} else {
 	    $ib--;
@@ -189,20 +187,19 @@ sub calc_similarity {
 }
 
 # 文字列照合でスコア計算
-# cc: common chars rate: 一致した文字数 / キーの文字数
+# cc: common chars rate
 sub calc_score_ccrate {
     my ($key, $ents_r) = @_;
     my $key_chars_r = counthash_to_list(mk_ngram($key, 1));
     foreach my $e (@$ents_r) {
 	my $ent_chars_r = counthash_to_list(mk_ngram($e->{str}, 1));
 	$e->{ccrate} = sprintf("%.4f", calc_similarity($key_chars_r, $ent_chars_r));
-
     }
     return $ents_r;
 } 
 
 # 文字列照合でスコア計算
-# vg: variable gram rate: 一致した全 ngram / キーの全 ngram
+# vg: variable gram rate
 sub calc_score_vgrate {
     my ($key, $ents_r) = @_;
     my $key_vgram_r = counthash_to_list(mk_all_ngram($key));
