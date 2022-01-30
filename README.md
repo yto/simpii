@@ -357,7 +357,7 @@ vgrate は全ngram(vgram)を単位に処理を行う。
 類似度計算方法: jaccard係数、dice係数、simpson係数。
 
 - qbase: query と target の一致要素数を query の要素数で割る（デフォルト）
-  - ※ ランキング順は一致要素数の多い順となる（転置インデックス検索での hits と同じ）
+  - ランキング順は一致要素数の多い順となり、転置インデックス検索での hits と同じになる
 - jaccard: query と target の一致要素数Aを query と target の要素数の合計からAを引いたもので割る
 - dice: query と target の一致要素数 x 2 を query と target の要素数の合計で割る
 - simpson: query と target の一致要素数を query と target の要素数のうち小さい方で割る
@@ -398,7 +398,7 @@ grep というか [agrep](https://ja.wikipedia.org/wiki/Agrep) 風な感じ。
 6:6	   ペンキ塗りたてで気味が悪いです
 ```
 
-"--regstr" で文字列の正規化（主に記号の全角半角変換）を行う。
+"--regstr" で文字列の正規化（英数記号の全角半角変換）を行う。
 ```
 % echo "abxc\nａｂ１００％\nｂｃ１２％" | ./nggrep --regstr --show --topn 3 abc100%  
 0.6667 ａｂ１００％
