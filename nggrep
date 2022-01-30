@@ -1,0 +1,144 @@
+#!/usr/bin/env perl
+# -*- coding: utf-8 -*-
+use strict;
+use warnings;
+use List::Util qw(min);
+use Getopt::Long qw(:config no_ignore_case);
+use Encode;
+use utf8;
+use open ':utf8';
+binmode STDIN, ":utf8";
+binmode STDOUT, ":utf8";
+$| = 1;
+
+my $field_2; # ents. not-defined: ALL, 0,1,2,...: (N+1)-th tsv column 
+my $similarity = "qbase"; # qbase(default) jaccard dice simpson
+my $n_of_ngram = 2; # 0:vgram, 1:uni-gram, 2:bi-gram, 3:tri-gram, ...
+my $top_n = 1;
+my $show_score;
+my $use_regstr;
+my $show_line_number;
+GetOptions (
+    "2=s" => \$field_2,
+    "topn=s" => \$top_n,
+    "similarity=s" => \$similarity,
+    "N|length=s" => \$n_of_ngram,
+    "show" => \$show_score,
+    "regstr" => \$use_regstr,
+    "n|line-number" => \$show_line_number,
+    );
+
+my $key = shift @ARGV;
+$key = Encode::decode_utf8($key) if not utf8::is_utf8($key);
+$key = regstr($key) if $use_regstr;
+my $key_chars_r = counthash_to_list($n_of_ngram ? mk_ngram($key, $n_of_ngram) : mk_all_ngram($key));
+
+my @results;
+while (<>) {
+    chomp;
+    my $line = $_;
+    my $str = (defined $field_2) ? ((split(/\t/, $line))[$field_2] || "") : $line;
+    $str = regstr($str) if $use_regstr;
+    my $ent_chars_r = counthash_to_list($n_of_ngram ? mk_ngram($str, $n_of_ngram) : mk_all_ngram($str));
+    my $score = sprintf("%.4f", calc_similarity($key_chars_r, $ent_chars_r));
+    store_nbest(\@results, $top_n, {score => $score, line => $line, line_number => $.});
+}
+
+foreach my $r (@results) {
+    print join("", map {
+	($show_score ? "$r->{score}\t" : "").
+	    ($show_line_number ? "$_->{line_number}:" : "").
+	    "$_->{line}\n"
+	       } @{$r->{lines}});
+}
+
+# list sorted by score
+# Ex. $l_r = [ {score => 0.8, lines => [...] }, {score => 0.4, lines => [...] }, ... ]
+sub store_nbest {
+    my ($l_r, $len_max, $cand) = @_;
+    return if $cand->{score} == 0;
+    my $min_score = @$l_r ? $l_r->[-1]{score} : 0;
+    if ($min_score <= $cand->{score}) {
+	for (my $i = 0; $i < @$l_r; $i++) {
+	    my $l = $l_r->[$i];
+	    if ($l->{score} < $cand->{score}) {
+		splice(@$l_r, $i, 0, {score => $cand->{score}, lines => [$cand]});
+		pop @$l_r if $len_max < @$l_r;
+		return;
+	    } elsif ($l->{score} == $cand->{score}) {
+		push @{$l->{lines}}, $cand;
+		return;
+	    }
+	}
+    } 
+    if (@$l_r < $top_n) {
+	push @$l_r, {score => $cand->{score}, lines => [$cand]};
+	return;
+    }
+}
+
+exit;
+
+# 文字列正規化
+sub regstr {
+    my ($str) = @_;
+    $str =~ tr/Ａ-Ｚａ-ｚ０-９　！”＃＄％＆’（）＊＋，−．／：；＜＝＞？＠［¥］＾＿‘｛｜｝〜/A-Za-z0-9 !"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~/;
+    return $str;
+}
+
+# "abc abc",3 => {"abc":2,"bc ":1,"c a":1," ab":1}
+sub mk_ngram {
+    my ($key, $n) = @_;
+    my @chars = split(//, $key);
+    my %ngram;
+    for (my $i = 0; $i < @chars - ($n - 1); $i++) {
+	$ngram{join("", @chars[$i..($i + ($n - 1))])}++;
+    }
+    return \%ngram;
+}
+
+# "aab" => {"aac":1,"aa":1,"ab":1,"a":2,"b":1}
+sub mk_all_ngram {
+    my ($key) = @_;
+    my @chars = split(//, $key);
+    my %vgram;
+    for (my $i = 0; $i < @chars; $i++) {
+	for (my $j = $i; $j < @chars; $j++) {
+	    $vgram{join("", @chars[$i..$j])}++;
+	}
+    }
+    return \%vgram;
+}
+
+# {"aac":1,"aa":1,"ab":1,"a":2,"b":1} => ("aaa","aa","ab","a","a","b")
+sub counthash_to_list {
+    my ($h_r) = @_;
+    return [sort map {($_) x $h_r->{$_}} keys %$h_r];
+}
+
+# (a a b c x) vs (a b d x x) => (a b x)
+sub common_items {
+    my ($a_r, $b_r) = @_;
+    my @common_items;
+    for (my ($ia, $ib) = (0, 0); $ia < @$a_r and $ib < @$b_r; $ia++, $ib++) {
+	if ($a_r->[$ia] eq $b_r->[$ib]) {
+	    push @common_items, $a_r->[$ia];
+	} elsif (($a_r->[$ia] cmp $b_r->[$ib]) > 0) {
+	    $ia--;
+	} else {
+	    $ib--;
+	}
+    }
+    return \@common_items;
+}
+
+# 類似度計算
+sub calc_similarity {
+    my ($A_r, $B_r) = @_;
+    my @AB = @{common_items($A_r, $B_r)};
+    return 0 if @AB == 0;
+    return @AB / @$A_r if $similarity =~ /^qbase/;
+    return @AB / (@$A_r + @$B_r - @AB) if $similarity =~ /^jaccard/;
+    return @AB * 2 / (@$A_r + @$B_r) if $similarity =~ /^dice/;
+    return @AB / min(@$A_r+0, @$B_r+0) if $similarity =~ /^simpson/;
+}
