@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 use strict;
 use warnings;
-use List::Util qw(max min);
-use Getopt::Long;
+use List::Util qw(sum max min);
+use Getopt::Long qw(:config no_ignore_case);
 use utf8;
 use open ':utf8';
 binmode STDIN, ":utf8";
@@ -13,10 +13,11 @@ $| = 1;
 my $field_1 = 0; # keys
 my $field_2 = 1; # ents
 my $top_n = 10;
-my @sort_by = (); # hits or ccrate or vgrate
+my @sort_by = (); # ccrate or vgrate
 my $auto_cut = 1; # 1(ON) or 0(OFF)
 my $show_mode = 1; # 0(OFF) or 1(with query+score) or 2(with query)
 my $similarity = "qbase"; # qbase(default) jaccard dice simpson
+my $n_of_ngram = 1; # for ccrate. 1:uni-gram, 2:bi-gram, 3:tri-gram, ...
 my $comment_block_prefix = "";
 GetOptions (
     "1=s" => \$field_1,
@@ -26,6 +27,7 @@ GetOptions (
     "autocut=s" => \$auto_cut,
     "show=s" => \$show_mode,
     "similarity=s" => \$similarity,
+    "N|length=s" => \$n_of_ngram,
     "comment-block-prefix=s" => \$comment_block_prefix,
     );
 
@@ -67,13 +69,20 @@ while (<>) {
 
 exit;
 
+# 文字列正規化
+sub regstr {
+    my ($str) = @_;
+    $str =~ tr/Ａ-Ｚａ-ｚ０-９　！”＃＄％＆’（）＊＋，−．／：；＜＝＞？＠［¥］＾＿‘｛｜｝〜/A-Za-z0-9 !"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~/;
+    return $str;
+}
+
 # reranking: calc score, filter, sort
 sub re_ranking {
-    my ($key, $lines_r, $auto_cut) = @_;
+    my ($key, $rr, $auto_cut) = @_;
 
     # calc
-    my $rr = calc_score_ccrate($key, $lines_r);
-    $rr = calc_score_vgrate($key, $lines_r);
+    calc_score_ccrate($key, $rr, $n_of_ngram);
+    calc_score_vgrate($key, $rr);
     
     # filter
     my $max_ccrate = max(map {$_->{ccrate}} @$rr);
@@ -93,13 +102,6 @@ sub re_ranking {
      } @$rr];
 };
 
-# 文字列正規化
-sub regstr {
-    my ($str) = @_;
-    $str =~ tr/Ａ-Ｚａ-ｚ０-９　！”＃＄％＆’（）＊＋，−．／：；＜＝＞？＠［¥］＾＿‘｛｜｝〜/A-Za-z0-9 !"#$%&'()*+,-.\/:;<=>?@[\]^_`{|}~/;
-    return $str;
-}
-
 # "abc abc",3 => {"abc":2,"bc ":1,"c a":1," ab":1}
 sub mk_ngram {
     my ($key, $n) = @_;
@@ -108,10 +110,10 @@ sub mk_ngram {
     for (my $i = 0; $i < @chars - ($n - 1); $i++) {
 	$ngram{join("", @chars[$i..($i + ($n - 1))])}++;
     }
-    return \%ngram;
+    return {num => sum(values %ngram), str => \%ngram};
 }
 
-# "aab" => {"aac":1,"aa":1,"ab":1,"a":2,"b":1}
+# "aab" => {"aab":1,"aa":1,"ab":1,"a":2,"b":1}
 sub mk_all_ngram {
     my ($key) = @_;
     my @chars = split(//, $key);
@@ -121,50 +123,40 @@ sub mk_all_ngram {
 	    $vgram{join("", @chars[$i..$j])}++;
 	}
     }
-    return \%vgram;
+    return {num => sum(values %vgram), str => \%vgram};
 }
 
-# {"aac":1,"aa":1,"ab":1,"a":2,"b":1} => ("aaa","aa","ab","a","a","b")
-sub counthash_to_list {
-    my ($h_r) = @_;
-    return [sort map {($_) x $h_r->{$_}} keys %$h_r];
-}
-
-# (a a b c x) vs (a b d x x) => (a b x)
+# {"a":2,"b":3,"c":1,"x":1} vs {"a":1,"b":2,"x":2} => {"a":1,"b":2,"x":1}
 sub common_items {
-    my ($a_r, $b_r) = @_;
-    my @common_items;
-    for (my ($ia, $ib) = (0, 0); $ia < @$a_r and $ib < @$b_r; $ia++, $ib++) {
-	if ($a_r->[$ia] eq $b_r->[$ib]) {
-	    push @common_items, $a_r->[$ia];
-	} elsif (($a_r->[$ia] cmp $b_r->[$ib]) > 0) {
-	    $ia--;
-	} else {
-	    $ib--;
-	}
+    my ($h1_r, $h2_r) = @_;
+    my %common;
+    foreach my $c (keys %$h1_r) {
+	next unless $h2_r->{$c};
+	my $com = min($h1_r->{$c}, $h2_r->{$c});
+	$common{$c} += $com;
     }
-    return \@common_items;
+    return {num => sum(values %common)||0, str => \%common};
 }
 
 # 類似度計算
 sub calc_similarity {
-    my ($A_r, $B_r) = @_;
-    my @AB = @{common_items($A_r, $B_r)};
-    return 0 if @AB == 0;
-    return @AB / @$A_r if $similarity =~ /^qbase/;
-    return @AB / (@$A_r + @$B_r - @AB) if $similarity =~ /^jaccard/;
-    return @AB * 2 / (@$A_r + @$B_r) if $similarity =~ /^dice/;
-    return @AB / min(@$A_r+0, @$B_r+0) if $similarity =~ /^simpson/;
+    my ($A, $B, $AB) = @_;
+    return 0 if $AB == 0;
+    return $AB / $A if $similarity =~ /^qbase/;
+    return $AB / ($A + $B - $AB) if $similarity =~ /^jaccard/;
+    return $AB * 2 / ($A + $B) if $similarity =~ /^dice/;
+    return $AB / min($A, $B) if $similarity =~ /^simpson/;
 }
 
 # 文字列照合でスコア計算
 # cc: common chars rate
 sub calc_score_ccrate {
-    my ($key, $ents_r) = @_;
-    my $key_chars_r = counthash_to_list(mk_ngram($key, 1));
+    my ($key, $ents_r, $n_of_ngram) = @_;
+    my $key_char_r = mk_ngram($key, $n_of_ngram);
     foreach my $e (@$ents_r) {
-	my $ent_chars_r = counthash_to_list(mk_ngram($e->{str}, 1));
-	$e->{ccrate} = sprintf("%.4f", calc_similarity($key_chars_r, $ent_chars_r));
+	my $ent_char_r = mk_ngram($e->{str}, $n_of_ngram);
+	my $common = common_items($key_char_r->{str}, $ent_char_r->{str});
+	$e->{ccrate} = sprintf("%.4f", calc_similarity($key_char_r->{num}, $ent_char_r->{num}, $common->{num}));
     }
     return $ents_r;
 } 
@@ -173,10 +165,11 @@ sub calc_score_ccrate {
 # vg: variable gram rate
 sub calc_score_vgrate {
     my ($key, $ents_r) = @_;
-    my $key_vgram_r = counthash_to_list(mk_all_ngram($key));
+    my $key_char_r = mk_all_ngram($key);
     foreach my $e (@$ents_r) {
-	my $ent_vgram_r = counthash_to_list(mk_all_ngram($e->{str}));
-	$e->{vgrate} = sprintf("%.4f", calc_similarity($key_vgram_r, $ent_vgram_r));
+	my $ent_char_r = mk_all_ngram($e->{str});
+	my $common = common_items($key_char_r->{str}, $ent_char_r->{str});
+	$e->{vgrate} = sprintf("%.4f", calc_similarity($key_char_r->{num}, $ent_char_r->{num}, $common->{num}));
     }
     return $ents_r;
 } 

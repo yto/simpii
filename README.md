@@ -142,6 +142,8 @@ query	Q01	これはペンギンですか？
 [2,0.7500,0.3333]	2	最近はどうですか？
 ```
 
+ccrate 計算時に使う単位を "-N" で指定できる。デフォルトは "-N 1" で「文字」である。"-N 2" で bi-gram となる。
+
 リランキング時のスコア（類似度）の計算方法を "--similarity" で指定できる。
 デフォルトは "--similarity qbase"。
 詳細は後述。
@@ -266,7 +268,7 @@ query	Q01	これはペンギンですか？
 空行で区切られたブロック単位でリランキングの処理を行う。
 ブロックの先頭行がクエリとなり、他はターゲット（エントリー）。
 
-オプション "-1", "-2", "--topn", "--sortby", "--autocut", "--show", "--similarity" は searchii.pl と同じ。
+オプション "-1", "-2", "--topn", "--sortby", "--autocut", "--show", "--similarity", "-N" は searchii.pl と同じ。
 
 オプション "--comment-block-prefix" で処理対象外のブロックの prefix 文字列を指定できる。
 ```
@@ -330,10 +332,11 @@ hits が大きいほど query と近い文字列。
 リランキング時の指定項目として、
 優先する処理単位 ("--sortby") と類似度計算方法 ("--similarity") の2つがある。
 
-優先する処理単位: 文字 (ccrate)  or 全ngram(vgram)。
+優先する処理単位: ngram (ccrate)  or 全ngram(vgram)。
 
-ccrate は文字を単位に処理を行う。
-デフォルトの類似度計算方法は、query と target の一致文字数を query の文字数で割ったもの (qbase)。
+ccrate はngramを単位に処理を行う。
+デフォルトの N-gram のNは1で unigram、つまり文字である（"-N" オプションで指定できる）。
+デフォルトの類似度計算方法は、query と target の一致ngram数（文字数）を query のngram数（文字数）で割ったもの (qbase)。
 
 - query: これはペンギンですか？ (11文字)
 - target: これはペンですね (8文字)

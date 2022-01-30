@@ -1,5 +1,9 @@
 2022-01-30  YAMASHITA Tatsuo  <yto@example.com>
 
+	* rerankonly.pl: fix similarity-functions.
+
+	* searchii.pl: fix similarity-functions.
+
 	* README.md: update.
 
 	* nggrep: new.
