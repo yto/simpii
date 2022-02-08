@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Search::Dict;
 use List::Util qw(sum max min);
-use Getopt::Long qw(:config no_ignore_case);
+use Getopt::Long qw(:config no_ignore_case autoabbrev);
 use utf8;
 use open ':utf8';
 binmode STDIN, ":utf8";

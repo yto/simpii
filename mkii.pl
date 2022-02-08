@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use utf8;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case autoabbrev);
 use open ':utf8';
 binmode STDIN, ":utf8";
 binmode STDOUT, ":utf8";

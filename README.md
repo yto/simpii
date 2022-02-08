@@ -410,6 +410,7 @@ grep というか [agrep](https://ja.wikipedia.org/wiki/Agrep) 風な感じ。
 
 オプション "--similarity" は searchii.pl, rerankonly.pl と同じ。
 
-スコアが同じ場合は出現順に出力される。
+スコアが同じ場合はファイル内での出現順に出力される。
 
+なお、処理速度は遅い。ちょっとした調査用。
 
