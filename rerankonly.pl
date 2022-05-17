@@ -62,7 +62,8 @@ while (<>) {
 
     if (@$lines_r) {
 	my $res_r = re_ranking($key, $lines_r, $auto_cut);
-	print "".($show_mode == 1 ? "[$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @$res_r;
+	my $max = min($top_n, @$res_r+0);
+	print "".($show_mode == 1 ? "[$_->{ccrate},$_->{vgrate}]\t" : "").$_->{line} for @{$res_r}[0..($max-1)];
     }
     print "\n";
 }
@@ -99,6 +100,7 @@ sub re_ranking {
 	    my $v = ($b->{$k} <=> $a->{$k});
 	    return $v if $v;
 	}
+	(length($a->{str}) <=> length($b->{str})) or ($a->{str} cmp $b->{str});
      } @$rr];
 };
 

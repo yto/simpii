@@ -1,3 +1,15 @@
+2022-05-17  YAMASHITA Tatsuo  <yto@example.com>
+
+	* test-rerankonly.txt: add sample
+
+	* searchii.pl (re_ranking): -
+
+	* rerankonly.pl (re_ranking): sort order: @sortby => length => cmp
+
+2022-03-05  YAMASHITA Tatsuo  <yto@example.com>
+
+	* rerankonly.pl: fix topn
+
 2022-01-30  YAMASHITA Tatsuo  <yto@example.com>
 
 	* rerankonly.pl: fix similarity-functions.

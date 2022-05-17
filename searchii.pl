@@ -128,6 +128,7 @@ sub re_ranking {
 	    my $v = ($b->{$k} <=> $a->{$k});
 	    return $v if $v;
 	}
+	(length($a->{str}) <=> length($b->{str})) or ($a->{str} cmp $b->{str});
      } @$rr];
 };
 
