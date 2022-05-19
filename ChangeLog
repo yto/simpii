@@ -1,3 +1,13 @@
+2022-05-19  YAMASHITA Tatsuo  <yto@example.com>
+
+	* rerankonly.pl (regstr): hyphens
+
+	* searchii.pl (regstr): hyphens
+
+	* mkii.pl (regstr): hyphens
+
+	* nggrep (regstr): hyphens
+
 2022-05-17  YAMASHITA Tatsuo  <yto@example.com>
 
 	* test-rerankonly.txt: add sample
