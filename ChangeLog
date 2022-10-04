@@ -1,3 +1,13 @@
+2022-10-04  YAMASHITA Tatsuo  <yto@example.com>
+
+	* searchii.pl: default index file is entry file ($ent_fn) + ".ii"
+
+	* mkii.pl: new option.  --max: max num of postitions in ii file
+
+2022-05-21  YAMASHITA Tatsuo  <yto@example.com>
+
+	* searchii.pl (look_and_get_ids): for no hits
+
 2022-05-19  YAMASHITA Tatsuo  <yto@example.com>
 
 	* rerankonly.pl (regstr): hyphens

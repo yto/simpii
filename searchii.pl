@@ -36,6 +36,8 @@ GetOptions (
     "N|length=s" => \$n_of_ngram,
     );
 
+$idx_fn = $ent_fn.".ii" if not $idx_fn and $ent_fn; # default index file
+
 open(my $fh_idx, "<", $idx_fn) or die "can't open [$idx_fn]";
 open(my $fh_ent, "<", $ent_fn) or die "can't open [$ent_fn]";
 
@@ -85,6 +87,7 @@ sub look_and_get_ids {
     foreach my $ngram (@$keys_r) {
 	look $fh, $ngram;
 	my $line = readline($fh);
+	$line ||= ""; # no hit 対策
 	next unless $line =~ /^\Q$ngram\E\t/; # no hit 対策
 	chomp $line;
 	$id_count{$_} += 1 for split(",", (split(/\t/, $line))[1]);
