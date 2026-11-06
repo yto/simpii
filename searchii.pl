@@ -98,7 +98,7 @@ sub look_and_get_ids {
 # FORMAT: ^[ID]....$
 sub get_contents {
     my ($ids_r, $fh) = @_;
-    return [grep {$_->{line} =~ /^\Q$_->{id}\E/} map {look $fh, $_; my $line = readline($fh); {id => $_, line => $line}} @$ids_r];
+    return [grep {defined $_->{line} and $_->{line} =~ /^\Q$_->{id}\E/} map {look $fh, $_; my $line = readline($fh); {id => $_, line => $line}} @$ids_r];
 }
 
 # 文字列正規化

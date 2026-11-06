@@ -1,3 +1,10 @@
+2026-11-06  Claude Code  <noreply at anthropic.com>
+
+	* searchii.pl (get_contents): skip undefined lines.  When an ID in the
+	index is missing from the entry file and sorts after its last line,
+	look() hits EOF and readline() returns undef, which caused an
+	"uninitialized value" warning.
+
 2022-10-04  YAMASHITA Tatsuo  <yto@example.com>
 
 	* searchii.pl: default index file is entry file ($ent_fn) + ".ii"
