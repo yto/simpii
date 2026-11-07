@@ -13,6 +13,20 @@ sudo yum install -y perl
 ```
 
 
+## インストール
+
+`make install` で `mkii.pl` `searchii.pl` `rerankonly.pl` `nggrep` を `/usr/local/bin` に入れる。
+入れる先は `PREFIX` で変えられる。
+```
+% make install                # /usr/local/bin に入れる
+% make install PREFIX=$HOME   # $HOME/bin に入れる
+% make uninstall PREFIX=$HOME # 消す
+```
+パッケージを作るときは `DESTDIR` も使える（`make install DESTDIR=/tmp/stage PREFIX=/usr/local`）。
+
+インストールせずに、このディレクトリのスクリプトをそのまま実行してもよい。
+
+
 ## 使い方
 
 機能の説明、兼、チュートリアル。

@@ -1,5 +1,13 @@
 2026-11-07  Claude Code  <noreply at anthropic.com>
 
+	* Makefile: new.  "make install" installs mkii.pl, searchii.pl,
+	rerankonly.pl and nggrep into $(PREFIX)/bin (default /usr/local).
+	Supports DESTDIR and "make uninstall".
+
+	* README.md: add an install section.
+
+2026-11-07  Claude Code  <noreply at anthropic.com>
+
 	* searchii.pl (calc_score_vgrate), rerankonly.pl (calc_score_vgrate):
 	speed up.  Instead of building all substrings of each entry, count
 	only those that also occur in the key, and stop extending from a
