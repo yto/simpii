@@ -169,10 +169,25 @@ sub calc_score_ccrate {
 sub calc_score_vgrate {
     my ($key, $ents_r) = @_;
     my $key_char_r = mk_all_ngram($key);
+    my $kh = $key_char_r->{str};
     foreach my $e (@$ents_r) {
-	my $ent_char_r = mk_all_ngram($e->{str});
-	my $common = common_items($key_char_r->{str}, $ent_char_r->{str});
-	$e->{vgrate} = sprintf("%.4f", calc_similarity($key_char_r->{num}, $ent_char_r->{num}, $common->{num}));
+	# count only substrings of the entry that also occur in the key.
+	# if a substring is not in the key, no longer substring starting at
+	# the same position is in the key either, so stop extending there.
+	my @chars = split(//, $e->{str});
+	my $len = @chars;
+	my %vgram;
+	for (my $i = 0; $i < $len; $i++) {
+	    my $s = "";
+	    for (my $j = $i; $j < $len; $j++) {
+		$s .= $chars[$j];
+		last unless $kh->{$s};
+		$vgram{$s}++;
+	    }
+	}
+	my $common = common_items(\%vgram, $kh); # iterate the smaller hash
+	# number of all substrings of the entry = len*(len+1)/2
+	$e->{vgrate} = sprintf("%.4f", calc_similarity($key_char_r->{num}, $len * ($len + 1) / 2, $common->{num}));
     }
     return $ents_r;
-} 
+}
